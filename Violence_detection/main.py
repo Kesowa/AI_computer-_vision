@@ -3,6 +3,10 @@ from pydantic import BaseModel
 from fastapi import BackgroundTasks, FastAPI
 import requests
 import urllib.request
+from lib import ViolenceDetector
+import os
+
+violence_detector = ViolenceDetector("./ModelWeightbest_bests.h5");
 
 app = FastAPI()
 
@@ -38,8 +42,10 @@ def detect_violence(body: VideoViolence):
     #     print("unable to download video")
     #     print(status)
     #     return
-    data = infer_video_violence(path)
+    # data = infer_video_violence(path)
+    data = violence_detector.predict_frames(path)
     res = requests.post(body.callback, data=data)
+    os.remove(path)
     print(res.json())
 
 

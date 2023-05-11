@@ -64,7 +64,8 @@ class ViolenceDetector:
                         metrics=["accuracy"])
         return model
 
-    def __init__(self):
+    def __init__(self, checkpoint: str):
+        self.MODEL_WEIGHTS_PATH = checkpoint
         self.model=my_model(tf)
         self.model = self._load_model()
         # self.frame_buffer = []
