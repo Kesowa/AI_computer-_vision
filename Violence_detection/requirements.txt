@@ -19,3 +19,11 @@ uvicorn==0.18.3
 uvloop==0.17.0
 watchfiles==0.17.0
 websockets==10.3
+tensorflow==2.7.0
+numpy==1.19.5
+scikit-image==0.18.3
+opencv-python==4.5.5.62
+Pillow==8.4.0
+h5py==3.5.0
+matplotlib==3.5.1
+protobuf==3.20

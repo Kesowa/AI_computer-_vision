@@ -1,23 +1,16 @@
 import cv2
 import os
 import numpy as np
-from tensorflow.keras.models import Sequential, Model, load_model
-from tensorflow.keras.layers import  Dropout, Dense, Flatten, Input
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.metrics import categorical_crossentropy
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
+import tensorflow as tf
+from tensorflow.keras.models import load_model
 
-from tensorflow.keras.utils import plot_model
-from tensorflow.keras.utils import to_categorical
 
-from tensorflow.keras.callbacks import Callback, ModelCheckpoint, LearningRateScheduler, TensorBoard, EarlyStopping, ReduceLROnPlateau
+IMG_SIZE = 128
+IMG_PER_FILE=30
+FRAME_BUFFER_SIZE=30
+MODEL_WEIGHTS_PATH = r'C:\Users\FS-AI\Desktop\violence_dont\Mode_single_frames30.h5'
 
-class ViolenceDetector:
-    IMG_SIZE = 128
-    MODEL_WEIGHTS_PATH = r'C:\Users\FS-AI\Desktop\violence_dont\Mode_single_frames30.h5'
-    FRAME_BUFFER_SIZE = 30
-    frame_count=0
-    def my_model(tf):
+def my_model(tf):
 
         # SEED
         np.random.seed(101)
@@ -31,7 +24,7 @@ class ViolenceDetector:
         
         cnn = models.Sequential()
     
-        input_shapes=(IMG_SIZE, IMG_SIZE, CHANNELS)
+        input_shapes=(IMG_SIZE, IMG_SIZE, 3)
 
         VGG19_MODEL = tf.keras.applications.vgg19.VGG19
 
@@ -42,7 +35,7 @@ class ViolenceDetector:
         cnn.add(layers.Flatten())
         model = models.Sequential()
         # add cnn model
-        model.add(layers.TimeDistributed(cnn, input_shape=(IMG_PER_FILE, IMG_SIZE, IMG_SIZE, CHANNELS)))
+        model.add(layers.TimeDistributed(cnn, input_shape=(IMG_PER_FILE, IMG_SIZE, IMG_SIZE, 3)))
         model.add(layers.LSTM(IMG_PER_FILE , return_sequences= True))
         model.add(layers.TimeDistributed(layers.Dense(90))) 
         ## Full-connected layers
@@ -55,7 +48,7 @@ class ViolenceDetector:
 
 
         model.add(layers.Dropout(0.3))
-        model.add(layers.Dense(NUM_CLASSES, activation="sigmoid"))
+        model.add(layers.Dense(2, activation="sigmoid"))
         adam = optimizers.Adam(learning_rate=0.0005, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
         #model.load_weights(wgts)
         rms = optimizers.RMSprop()
@@ -64,17 +57,23 @@ class ViolenceDetector:
                         metrics=["accuracy"])
         return model
 
+class ViolenceDetector:
     def __init__(self, checkpoint: str):
-        self.MODEL_WEIGHTS_PATH = checkpoint
+        IMG_SIZE = 128
+        MODEL_WEIGHTS_PATH = checkpoint
+        # MODEL_WEIGHTS_PATH = r'C:\Users\FS-AI\Desktop\violence_dont\ModelWeights.h5'
+
+        FRAME_BUFFER_SIZE = 30
+        frame_count=0
         self.model=my_model(tf)
-        self.model = self._load_model()
+        # self.model = self._load_model()
         # self.frame_buffer = []
 
     def _load_model(self):
-        model.load_weights(self.MODEL_WEIGHTS_PATH)
+        self.model.load_weights(MODEL_WEIGHTS_PATH)
         # Load your trained model from the specified path
         # model = load_model(self.MODEL_WEIGHTS_PATH)
-        return model
+        return 
 
     def _predictor(self, preds):
         if preds[0] > 0.1:
@@ -98,12 +97,12 @@ class ViolenceDetector:
             # if frame_count % 5 != 0:  # skip frames that are not multiples of 5
             #     continue
             rgb_img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            frm = cv2.resize(rgb_img, (self.IMG_SIZE, self.IMG_SIZE))
+            frm = cv2.resize(rgb_img, (IMG_SIZE, IMG_SIZE))
             frm = np.expand_dims(frm, axis=0)
             frm = frm / 255.0
             frames.append(frm)
             count += 1
-            if count == self.FRAME_BUFFER_SIZE:
+            if count == FRAME_BUFFER_SIZE:
                 X = np.array(frames)
                 X = np.squeeze(X, axis=1)
                 X = np.expand_dims(X, axis=0)
