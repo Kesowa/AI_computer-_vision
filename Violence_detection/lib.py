@@ -107,9 +107,7 @@ class ViolenceDetector:
                 X = np.squeeze(X, axis=1)
                 X = np.expand_dims(X, axis=0)
                 preds = self.model.predict(X)
-                row = []
-                for pred in preds:
-                    row.append([pred[1], pred[0]])
+                row = [float(preds[0][1]), float(preds[0][0])]
                 predictions['Values'].append(row)
                 frames = []
                 count = 0

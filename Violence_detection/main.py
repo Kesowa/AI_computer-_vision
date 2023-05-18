@@ -44,7 +44,7 @@ def detect_violence(body: VideoViolence):
     #     return
     # data = infer_video_violence(path)
     data = violence_detector.predict_frames(path)
-    res = requests.post(body.callback, data=data)
+    res = requests.post(body.callback, json=data)
     os.remove(path)
     print(res.json())
 
