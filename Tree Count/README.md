@@ -1,4 +1,4 @@
-## Tree Canopy Detection using DeepForest
+## Tree Crown Count using DeepForest
 
 The provided code snippet will allow you to process an image, evaluate the pre-trained model, and visualize the results with adjusted bounding boxes overlaid on the image.
 
