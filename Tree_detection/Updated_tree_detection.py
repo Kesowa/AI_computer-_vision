@@ -1,25 +1,20 @@
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import csv
-import torch
-import time
 import os
 import geopandas as gpd
 from shapely.geometry import Polygon
-from deepforest import main
 import shutil
 import pandas as pd
 
-
 class DeepForestModel:
-    def __init__(self):
+    def __init__(self, source_image):
         # Instantiate a new model object
         self.model = main.deepforest()
         self.model.use_release()
         self.num_trees = 0  # Number of trees variable
 
-        self.source_image = r"C:\Users\FS-AI\Downloads\Tree canopy\Ramkrishna_Mahato\tree_canopy2482.JPG" # change it to accoringly
-
+        self.source_image = source_image
 
         self.destination_folder = r"C:\Users\FS-AI\Downloads\Tree canopy\Chayan_mandal"
         self.test_file = "data.csv"
@@ -30,11 +25,6 @@ class DeepForestModel:
         # Load the saved state dictionary into the new model object
         state_dict = torch.load(model_path)
         self.model.load_state_dict(state_dict)
-
-    def train(self, train_data):
-        start_time = time.time()
-        self.model.trainer.fit(train_data)
-        print(f"--- Training on CPU: {(time.time() - start_time):.2f} seconds ---")
 
     def evaluate(self, test_file, save_dir):
         results = self.model.evaluate(test_file, os.path.dirname(test_file), iou_threshold=0.4, savedir=save_dir)
@@ -96,7 +86,7 @@ class DeepForestModel:
         # Create the CSV file with header and example data
         data = [
             ["image_path", "xmin", "ymin", "xmax", "ymax", "label"],
-            ["tree_canopy2482.JPG", "1", "1", "1", "1", "Tree"]
+            [os.path.basename(self.source_image), "1", "1", "1", "1", "Tree"]
         ]
 
         with open(csv_file_path, mode='w', newline='') as file:
@@ -159,8 +149,11 @@ class DeepForestModel:
 
 # Usage example
 if __name__ == '__main__':
-    # Create an instance of the class
-    my_model = DeepForestModel()
+    # Get the source image path from the user
+    source_image = input("Enter the source image path: ")
+
+    # Create an instance of the class with the provided source image
+    my_model = DeepForestModel(source_image)
 
     # Load the saved model
     model_path = "my_model.pt"
