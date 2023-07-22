@@ -4,6 +4,7 @@ import csv
 import os
 import geopandas as gpd
 from shapely.geometry import Polygon
+from deepforest import main
 import shutil
 import pandas as pd
 
