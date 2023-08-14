@@ -7,7 +7,7 @@ from shapely.geometry import Polygon
 from deepforest import main
 import shutil
 import pandas as pd
-
+import torch
 class DeepForestModel:
     def __init__(self, source_image):
         # Instantiate a new model object
@@ -17,10 +17,14 @@ class DeepForestModel:
 
         self.source_image = source_image
 
-        self.destination_folder = r"C:\Users\FS-AI\Downloads\Tree canopy\Chayan_mandal"
         self.test_file = "data.csv"
-        self.save_dir = r"C:\king"
-        self.output_shapefile_path = r"C:\king\output_adjusted_shapefile.shp"
+        self.save_dir = r"C:\Users\FS-AI\Desktop\try_kesowa"# path to directory where you want to save output shape file.
+        self.destination_folder = self.save_dir
+
+        if not os.path.exists(self.save_dir):
+    # Create the directory if it doesn't exist
+            os.makedirs(self.save_dir)
+        self.output_shapefile_path = r"C:\Users\FS-AI\Desktop\try_kesowa\king\output_adjusted_shapefile.shp"
 
     def load_model(self, model_path):
         # Load the saved state dictionary into the new model object
@@ -162,6 +166,6 @@ if __name__ == '__main__':
 
     # Process the image and evaluate the model
     results, num_trees = my_model.process_and_evaluate()
-
+    print(f"number of trees is : {num_trees}")
     # Visualize the results
     my_model.visualize_results(results)
