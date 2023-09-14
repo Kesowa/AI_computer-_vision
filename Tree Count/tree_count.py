@@ -1,52 +1,100 @@
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import csv
-import torch
-import time
 import os
 import geopandas as gpd
 from shapely.geometry import Polygon
 from deepforest import main
 import shutil
 import pandas as pd
-
-
+import torch
+from PIL import Image
+import cv2
+import numpy as np
+import rasterio
+from rasterio.windows import Window
 class DeepForestModel:
-    def _init_(self):
+    counter=0
+
+    def __init__(self, source_image):
         # Instantiate a new model object
         self.model = main.deepforest()
         self.model.use_release()
         self.num_trees = 0  # Number of trees variable
 
-        self.source_image = r"C:\Users\FS-AI\Downloads\Tree canopy\Ramkrishna_Mahato\tree_canopy2482.JPG" # change it to accoringly
-
-        
-        self.destination_folder = r"C:\Users\FS-AI\Downloads\Tree canopy\Chayan_mandal"
+        self.source_image = source_image
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")# adde
         self.test_file = "data.csv"
-        self.save_dir = r"C:\king"
-        self.output_shapefile_path = r"C:\king\output_adjusted_shapefile.shp"
+        # path = f"C:\\Users\\FS-AI\\Desktop\\try_kesowa\\king\\output_adjusted_shapefile{DeepForestModel.counter}.shp"
 
+        DeepForestModel.counter += 1
+        self.save_dir = r"C:\Users\FS-AI\Desktop\try_kesowa\1gb_part_shape1"# path to directory where you want to save output shape file.
+        self.destination_folder = self.save_dir
+
+        if not os.path.exists(self.save_dir):
+    # Create the directory if it doesn't exist
+            os.makedirs(self.save_dir)
+
+    def process_tiff_image(self, tiff_path):
+        with rasterio.open(tiff_path) as src:
+            # Calculate the number of tiles in both dimensions
+            n_tiles_x = int(np.ceil(src.width / 700))
+            n_tiles_y = int(np.ceil(src.height / 700))
+
+            total_trees = 0
+
+            for i in range(n_tiles_y):
+                for j in range(n_tiles_x):
+                    # Define the window to read
+                    window = Window(j*700, i*700, 700, 700)
+                    tile = src.read(window=window)
+
+                    # Convert the 3D array to a PIL image
+                    tile_image = Image.fromarray(np.transpose(tile, (1, 2, 0)))
+
+                    # Save tile image temporarily
+                    tile_path = os.path.join(self.destination_folder, f"tile_{i}_{j}.png")
+                    tile_image.save(tile_path)
+
+                    # Set the tile as the current source image
+                    self.source_image = tile_path
+                    results, num_trees = self.process_and_evaluate()
+                    total_trees += num_trees
+                    bounding_boxes = results['predictions']
+
+                    adjusted_boxes = self.adjust_bounding_boxes(bounding_boxes, 700)
+
+                    # Save the adjusted bounding boxes as a shapefile
+                    self.save_adjusted_bounding_boxes_as_shapefile(adjusted_boxes, self.get_shapefile_path(f"tile_{i}_{j}.png"))
+
+                    # Remove the temporary tile image
+                    os.remove(tile_path)
+
+            return total_trees
+    def get_shapefile_path(self, image_filename):
+        # Extract the base name without extension
+        base_name = os.path.splitext(image_filename)[0]
+        # Use this base name for the shapefile
+        shapefile_name = f"{base_name}.shp"
+        path = os.path.join(self.save_dir, shapefile_name)
+        return path
     def load_model(self, model_path):
         # Load the saved state dictionary into the new model object
-        state_dict = torch.load(model_path)
+        state_dict = torch.load(model_path, map_location=self.device)
         self.model.load_state_dict(state_dict)
-
-    def train(self, train_data):
-        start_time = time.time()
-        self.model.trainer.fit(train_data)
-        print(f"--- Training on CPU: {(time.time() - start_time):.2f} seconds ---")
+        self.model.to(self.device)
 
     def evaluate(self, test_file, save_dir):
         results = self.model.evaluate(test_file, os.path.dirname(test_file), iou_threshold=0.4, savedir=save_dir)
         self.num_trees = len(results['predictions'])  # Update number of trees
         return results
-
     def save_adjusted_bounding_boxes_as_shapefile(self, adjusted_boxes, output_path):
         # Create a GeoDataFrame with the adjusted bounding boxes
         adjusted_gdf = gpd.GeoDataFrame({'geometry': adjusted_boxes})
 
         # Save the GeoDataFrame as a shapefile
         adjusted_gdf.to_file(output_path)
+
 
     def adjust_bounding_boxes(self, bounding_boxes, image_height):
         adjusted_boxes = []
@@ -83,12 +131,45 @@ class DeepForestModel:
 
         # Save the DataFrame back to the test file
         a.to_csv(test_file_path, index=False)
+    def process_image(self):
+        # Load the source TIFF image using PIL (Python Imaging Library)
+        image = Image.open(self.source_image)
+
+        # Calculate the new dimensions while maintaining the aspect ratio
+        max_dimension = 700  # Set a reasonable maximum dimension
+        width, height = image.size
+        if width > max_dimension or height > max_dimension:
+            ratio = max_dimension / max(width, height)
+            new_width = int(width * ratio)
+            new_height = int(height * ratio)
+            image = image.resize((new_width, new_height), Image.ANTIALIAS)
+
+        # Copy the resized image to the destination folder
+        destination_image_path = os.path.join(self.destination_folder, os.path.basename(self.source_image))
+        image.save(destination_image_path)
+
+        # Get the filename from the source image path
+        filename = os.path.basename(destination_image_path)
+
+        # Create the test file path
+        test_file_path = os.path.join(self.destination_folder, self.test_file)
+
+        # Read the test file into a DataFrame
+        a = pd.read_csv(test_file_path)
+
+        # Set the 'image_path' column to the filename
+        a['image_path'] = filename
+
+        # Save the DataFrame back to the test file
+        a.to_csv(test_file_path, index=False)
+    # def process_image(self):
 
     def create_destination_folder_and_csv(self):
         if not os.path.exists(self.destination_folder):
             os.makedirs(self.destination_folder)
         else:
             print("Destination folder already exists.")
+        
 
         # Specify the CSV file path
         csv_file_path = os.path.join(self.destination_folder, self.test_file)
@@ -96,7 +177,7 @@ class DeepForestModel:
         # Create the CSV file with header and example data
         data = [
             ["image_path", "xmin", "ymin", "xmax", "ymax", "label"],
-            ["tree_canopy2482.JPG", "1", "1", "1", "1", "Tree"]
+            [os.path.basename(self.source_image), "1", "1", "1", "1", "Tree"]
         ]
 
         with open(csv_file_path, mode='w', newline='') as file:
@@ -106,19 +187,34 @@ class DeepForestModel:
         print("CSV file created and saved successfully.")
 
     def process_and_evaluate(self):
-        # Create the destination folder and CSV file
         self.create_destination_folder_and_csv()
 
-        # Process the image (copy and update test file)
         self.process_image()
-
-        # Evaluate the model on the test file and save the results
         results = self.evaluate(os.path.join(self.destination_folder, self.test_file), self.save_dir)
 
-        # Get the number of trees from the class
         num_trees = self.num_trees
 
         return results, num_trees
+
+    def process_images_in_folder(self, image_folder):
+        total_trees = 0
+
+        for filename in os.listdir(image_folder):
+            if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp')):
+                # Process each image
+                self.source_image = os.path.join(image_folder, filename)
+                results, num_trees = self.process_and_evaluate()
+                total_trees += num_trees
+                bounding_boxes = results['predictions']
+
+                adjusted_boxes = self.adjust_bounding_boxes(bounding_boxes, 700)
+
+                # Save the adjusted bounding boxes as a shapefile
+                self.save_adjusted_bounding_boxes_as_shapefile(adjusted_boxes, self.get_shapefile_path(filename))
+
+        return total_trees
+
+
 
     def visualize_results(self, results):
         img = mpimg.imread(self.source_image)
@@ -130,7 +226,7 @@ class DeepForestModel:
         adjusted_boxes = self.adjust_bounding_boxes(bounding_boxes, image_height)
 
         # Save the adjusted bounding boxes as a shapefile
-        self.save_adjusted_bounding_boxes_as_shapefile(adjusted_boxes, self.output_shapefile_path)
+        self.save_adjusted_bounding_boxes_as_shapefile(adjusted_boxes, self.get_shapefile_path())
 
         # Load the shapefile into a GeoDataFrame
         gdf = gpd.read_file(self.output_shapefile_path)
@@ -157,15 +253,19 @@ class DeepForestModel:
         plt.show()
 
 
-# Usage example
-if _name_ == '_main_':
+    
+if __name__ == '__main__':
     # Create an instance of the class
-    my_model = DeepForestModel()
+    my_model = DeepForestModel(None)
 
     # Load the saved model
     model_path = "my_model.pt"
     my_model.load_model(model_path)
-
-    # Process the image and e=valuate the model
-    results, num_trees = my_model.process_and_evaluate()
-print(num_trees)
+    
+    # Path to the TIFF file
+    tiff_path = r"C:\Users\FS-AI\Downloads\1673590088754_Ortho.tif"
+    
+    # Process the TIFF file
+    total_detected_trees = my_model.process_tiff_image(tiff_path)
+    print(f"Total number of trees detected: {total_detected_trees}")
+#
