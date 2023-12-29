@@ -28,7 +28,7 @@ class DeepForestModel:
         # path = f"C:\\Users\\FS-AI\\Desktop\\try_kesowa\\king\\output_adjusted_shapefile{DeepForestModel.counter}.shp"
 
         DeepForestModel.counter += 1
-        self.save_dir = r"C:\Users\FS-AI\Desktop\try_kesowa\1gb_part_shape1"# path to directory where you want to save output shape file.
+        self.save_dir = r"C:\Users\FS-AI\Desktop\output_current1"# path to directory where you want to save output shape file.
         self.destination_folder = self.save_dir
 
         if not os.path.exists(self.save_dir):
@@ -134,9 +134,10 @@ class DeepForestModel:
     def process_image(self):
         # Load the source TIFF image using PIL (Python Imaging Library)
         image = Image.open(self.source_image)
-
+        resolution = self.calculate_resolution(self.source_image)
+        print(f"Resolution of {self.source_image}: {resolution} meters/pixel")
         # Calculate the new dimensions while maintaining the aspect ratio
-        max_dimension = 700  # Set a reasonable maximum dimension
+        max_dimension = self.calculate_window_size(resolution)  # Set a reasonable maximum dimension
         width, height = image.size
         if width > max_dimension or height > max_dimension:
             ratio = max_dimension / max(width, height)
@@ -163,6 +164,17 @@ class DeepForestModel:
         # Save the DataFrame back to the test file
         a.to_csv(test_file_path, index=False)
     # def process_image(self):
+    def calculate_window_size(self, resolution):
+        if resolution <= 0.1:
+            # For 0.1m data, use a window size in the range of 400-800 pixels
+            return int((400 + 800) / 2)
+        elif resolution > 0.1:
+            # For coarser resolution tiles, you may experiment with larger window sizes
+            # Adjust this based on your specific requirements
+            return int(resolution * 4000)  # Adjust some_scaling_factor
+        else:
+            # Handle other cases or provide default value
+            return 700  # Default value
 
     def create_destination_folder_and_csv(self):
         if not os.path.exists(self.destination_folder):
@@ -252,7 +264,15 @@ class DeepForestModel:
 
         plt.show()
 
+    def calculate_resolution(self,tiff_path):
+        with rasterio.open(tiff_path) as src:
+            # Get the pixel size in the x and y dimensions
+            pixel_x_size, pixel_y_size = src.res
 
+            # Calculate the resolution (assuming square pixels)
+            resolution = (pixel_x_size + pixel_y_size) / 2.0
+
+        return resolution
     
 if __name__ == '__main__':
     # Create an instance of the class
@@ -268,4 +288,3 @@ if __name__ == '__main__':
     # Process the TIFF file
     total_detected_trees = my_model.process_tiff_image(tiff_path)
     print(f"Total number of trees detected: {total_detected_trees}")
-#
