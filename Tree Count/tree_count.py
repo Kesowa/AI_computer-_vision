@@ -166,12 +166,12 @@ class DeepForestModel:
     # def process_image(self):
     def calculate_window_size(self, resolution):
         if resolution <= 0.1:
-            # For 0.1m data, use a window size in the range of 400-800 pixels
-            return int((400 + 800) / 2)
+            # For 0.1m data, use a linear interpolation between 400 and 800 pixels
+            return int(np.interp(resolution, [0, 0.1], [400, 800]))
         elif resolution > 0.1:
             # For coarser resolution tiles, you may experiment with larger window sizes
             # Adjust this based on your specific requirements
-            return int(resolution * 4000)  # Adjust some_scaling_factor
+            return int(resolution * 40000)  # Adjust some_scaling_factor
         else:
             # Handle other cases or provide default value
             return 700  # Default value
@@ -264,13 +264,13 @@ class DeepForestModel:
 
         plt.show()
 
-    def calculate_resolution(self,tiff_path):
+    def calculate_resolution(self, tiff_path):
         with rasterio.open(tiff_path) as src:
             # Get the pixel size in the x and y dimensions
             pixel_x_size, pixel_y_size = src.res
 
-            # Calculate the resolution (assuming square pixels)
-            resolution = (pixel_x_size + pixel_y_size) / 2.0
+            # Calculate the root-mean-square of pixel sizes
+            resolution = np.sqrt(pixel_x_size**2 + pixel_y_size**2)
 
         return resolution
     
