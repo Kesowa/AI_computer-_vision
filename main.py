@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import vtracer as vt
 
 def extract_largest_feature(image_path, output_path):
     # Load the image in grayscale mode
@@ -38,7 +39,15 @@ def extract_largest_feature(image_path, output_path):
     largest_feature = cv2.bitwise_and(image, image, mask=mask)
     
     # Save or display the result
-    cv2.imwrite(output_path, largest_feature)
+    cv2.imwrite(output_path, cv2.bitwise_not(largest_feature))
+    vt.convert_image_to_svg_py(
+                               output_path, 
+                               "output.svg", 
+                               colormode="binary",
+                               hierarchical="cutout",
+                               mode="polygon",
+                               filter_speckle=32,
+                           )
 
 
 # Example usage:
