@@ -46,7 +46,7 @@ def extract_largest_feature(image_path, output_path):
                                colormode="binary",
                                hierarchical="cutout",
                                mode="polygon",
-                               filter_speckle=32,
+                               filter_speckle=8,
                            )
 
 
