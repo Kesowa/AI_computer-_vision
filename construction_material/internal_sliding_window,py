@@ -1,0 +1,172 @@
+import os
+import tifffile
+import rasterio
+from pyproj import Proj, transform
+import json
+import torch
+from models.experimental import attempt_load
+from utils.general import non_max_suppression, scale_coords
+from utils.datasets import letterbox
+
+# Path to the TIFF image
+# tiff_image_path = r"C:\Users\FS-AI\Downloads\AareyColonyOrthomosaic_4Band_2.7cm.tif"
+tiff_image_path = r"C:\Users\FS-AI\Downloads\Ortho_25cm.tif"
+
+
+
+# Define the slice size
+slice_size = (700, 700)
+
+# Load the YOLOv7 model
+weights_path = r"C:\Users\FS-AI\Desktop\Construction_materials\best.pt"
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+model = attempt_load(weights_path, map_location=device)
+model.eval()
+
+# Open the TIFF image using tifffile
+large_image = tifffile.imread(tiff_image_path)
+image_height, image_width, num_channels = large_image.shape
+
+# Ensure the image has 3 channels, convert if necessary
+def ensure_rgb(slice_image):
+    if slice_image.shape[2] == 4:  # RGBA -> RGB
+        slice_image = cv2.cvtColor(slice_image, cv2.COLOR_RGBA2RGB)
+    return slice_image
+
+# Retrieve the CRS and transformation matrix using rasterio
+with rasterio.open(tiff_image_path) as dataset:
+    crs = dataset.crs
+    transform_matrix = dataset.transform
+    native_proj = Proj(crs)  # Native CRS projection
+
+# Define the WGS84 projection
+wgs84_proj = Proj(proj='latlong', datum='WGS84')
+
+# Initialize a counter for naming the slices and creating GeoJSON features
+geojson_features = []
+
+# Custom class thresholds from your detect.py
+class_thresholds = {
+    0: 0.05,   # Class 0 (bamboo)
+    1: 0.09,   # Class 1 (brick)
+    2: 0.05,   # Class 2 (gravel)
+    3: 0.09,   # Class 3 (debris)
+    4: 0.10,   # Class 4 (sand)
+    5: 0.001,  # Class 5 (slurry)
+    6: 0.005   # Class 6 (wood)
+}
+
+# Function to run YOLOv7 on a single image slice
+def run_yolov7_on_slice(slice_image):
+    img = letterbox(slice_image, new_shape=704)[0]  # Resize to 704 (or as per your model input size)
+    img = img.transpose(2, 0, 1)  # Convert to channels-first format
+    img = torch.from_numpy(img).to(device)
+    img = img.float() / 255.0  # Normalize to [0,1]
+    img = img.unsqueeze(0)  # Add batch dimension
+    
+    # Perform inference
+    with torch.no_grad():
+        pred = model(img)[0]
+    
+    # Apply NMS (with a very low threshold for now)
+    pred = non_max_suppression(pred, 0.0, 0.0001)  # We'll handle class-specific thresholds later
+    return pred
+
+# Iterate over the image in a sliding window fashion
+for y in range(0, image_height, slice_size[1]):
+    for x in range(0, image_width, slice_size[0]):
+        x1, y1 = x, y
+        x2, y2 = min(x + slice_size[0], image_width), min(y + slice_size[1], image_height)
+
+        # Extract the current slice
+        slice_image = large_image[y1:y2, x1:x2]
+
+        # Ensure the slice has 3 channels (RGB)
+        slice_image = ensure_rgb(slice_image)
+
+        # Run YOLOv7 on this slice
+        predictions = run_yolov7_on_slice(slice_image)
+
+        # Process predictions with custom class thresholds
+        for det in predictions:
+            if len(det):
+                # Rescale boxes from model size to slice size
+                det[:, :4] = scale_coords(img.shape[2:], det[:, :4], slice_image.shape).round()
+                
+                for *xyxy, conf, cls in reversed(det):
+                    cls = int(cls)
+                    if conf > class_thresholds.get(cls, 0.0):  # Apply class-specific threshold
+                        # Convert pixel coordinates to geographic coordinates (UTM or native CRS)
+                        xmin, ymin, xmax, ymax = map(int, xyxy)
+
+                        # Ensure bounding box stays within the slice
+                        xmin = max(xmin, 0)
+                        ymin = max(ymin, 0)
+                        xmax = min(xmax, slice_image.shape[1])
+                        ymax = min(ymax, slice_image.shape[0])
+
+                        top_left_utm = rasterio.transform.xy(transform_matrix, y1 + ymin, x1 + xmin)
+                        bottom_right_utm = rasterio.transform.xy(transform_matrix, y1 + ymax, x1 + xmax)
+
+                        # Convert UTM (or native CRS) to WGS84
+                        bbox_top_left_lon, bbox_top_left_lat = transform(native_proj, wgs84_proj, *top_left_utm)
+                        bbox_bottom_right_lon, bbox_bottom_right_lat = transform(native_proj, wgs84_proj, *bottom_right_utm)
+
+                        # Create a GeoJSON feature for this detection
+                        feature = {
+                            "type": "Feature",
+                            "properties": {
+                                "class_id": cls,
+                                "confidence": float(conf)
+                            },
+                            "geometry": {
+                                "type": "Polygon",
+                                "coordinates": [[
+                                    [bbox_top_left_lon, bbox_top_left_lat],
+                                    [bbox_bottom_right_lon, bbox_top_left_lat],
+                                    [bbox_bottom_right_lon, bbox_bottom_right_lat],
+                                    [bbox_top_left_lon, bbox_bottom_right_lat],
+                                    [bbox_top_left_lon, bbox_top_left_lat]
+                                ]]
+                            }
+                        }
+                        geojson_features.append(feature)
+
+        # Add the current slice as a black box in GeoJSON
+        # Convert the corners of the slice to geographic coordinates
+        top_left_utm = rasterio.transform.xy(transform_matrix, y1, x1)
+        bottom_right_utm = rasterio.transform.xy(transform_matrix, y2, x2)
+
+        # Convert UTM (or native CRS) to WGS84 for the slice boundary
+        bbox_top_left_lon, bbox_top_left_lat = transform(native_proj, wgs84_proj, *top_left_utm)
+        bbox_bottom_right_lon, bbox_bottom_right_lat = transform(native_proj, wgs84_proj, *bottom_right_utm)
+
+        # Add the slice boundary as a black box feature in the GeoJSON
+        slice_feature = {
+            "type": "Feature",
+            "properties": {
+                "class_id": "slice_boundary",
+                "confidence": None
+            },
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [[
+                    [bbox_top_left_lon, bbox_top_left_lat],
+                    [bbox_bottom_right_lon, bbox_top_left_lat],
+                    [bbox_bottom_right_lon, bbox_bottom_right_lat],
+                    [bbox_top_left_lon, bbox_bottom_right_lat],
+                    [bbox_top_left_lon, bbox_top_left_lat]
+                ]]
+            }
+        }
+        geojson_features.append(slice_feature)
+
+# Write the GeoJSON output to a file
+geojson_data = {
+    "type": "FeatureCollection",
+    "features": geojson_features
+}
+
+with open("output_detections.geojson", "w") as geojson_file:
+    json.dump(geojson_data, geojson_file, indent=2)
+    
