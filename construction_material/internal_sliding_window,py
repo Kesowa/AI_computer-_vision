@@ -1,17 +1,17 @@
-import os
+import torch
+import cv2
 import tifffile
 import rasterio
+from rasterio.transform import xy
 from pyproj import Proj, transform
-import json
-import torch
 from models.experimental import attempt_load
 from utils.general import non_max_suppression, scale_coords
 from utils.datasets import letterbox
+import json
 
 # Path to the TIFF image
 # tiff_image_path = r"C:\Users\FS-AI\Downloads\AareyColonyOrthomosaic_4Band_2.7cm.tif"
 tiff_image_path = r"C:\Users\FS-AI\Downloads\Ortho_25cm.tif"
-
 
 
 # Define the slice size
@@ -23,7 +23,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model = attempt_load(weights_path, map_location=device)
 model.eval()
 
-# Open the TIFF image using tifffile
+
 large_image = tifffile.imread(tiff_image_path)
 image_height, image_width, num_channels = large_image.shape
 
@@ -56,7 +56,7 @@ class_thresholds = {
     6: 0.005   # Class 6 (wood)
 }
 
-# Function to run YOLOv7 on a single image slice
+# Function to run YOLOv7 on a single image slice using the second code's logic
 def run_yolov7_on_slice(slice_image):
     img = letterbox(slice_image, new_shape=704)[0]  # Resize to 704 (or as per your model input size)
     img = img.transpose(2, 0, 1)  # Convert to channels-first format
@@ -64,16 +64,20 @@ def run_yolov7_on_slice(slice_image):
     img = img.float() / 255.0  # Normalize to [0,1]
     img = img.unsqueeze(0)  # Add batch dimension
     
-    # Perform inference
+    # Perform inference using the second code's logic
     with torch.no_grad():
         pred = model(img)[0]
     
-    # Apply NMS (with a very low threshold for now)
-    pred = non_max_suppression(pred, 0.0, 0.0001)  # We'll handle class-specific thresholds later
+    # Apply NMS (with generic thresholds, class-specific thresholds applied later)
+    pred = non_max_suppression(pred, 0.0, 0.45)  # Low confidence for initial NMS
     return pred
-
+print(image_height)
 # Iterate over the image in a sliding window fashion
+
+
+
 for y in range(0, image_height, slice_size[1]):
+    print(y)
     for x in range(0, image_width, slice_size[0]):
         x1, y1 = x, y
         x2, y2 = min(x + slice_size[0], image_width), min(y + slice_size[1], image_height)
@@ -84,18 +88,21 @@ for y in range(0, image_height, slice_size[1]):
         # Ensure the slice has 3 channels (RGB)
         slice_image = ensure_rgb(slice_image)
 
-        # Run YOLOv7 on this slice
+        # Run YOLOv7 on this slice using the second code's prediction logic
         predictions = run_yolov7_on_slice(slice_image)
 
-        # Process predictions with custom class thresholds
+        # Process predictions with class-specific thresholds
         for det in predictions:
             if len(det):
                 # Rescale boxes from model size to slice size
-                det[:, :4] = scale_coords(img.shape[2:], det[:, :4], slice_image.shape).round()
+                det[:, :4] = scale_coords([704, 704], det[:, :4], slice_image.shape).round()
+
                 
                 for *xyxy, conf, cls in reversed(det):
                     cls = int(cls)
-                    if conf > class_thresholds.get(cls, 0.0):  # Apply class-specific threshold
+                    
+                    # Apply class-specific confidence threshold
+                    if conf > class_thresholds.get(cls, 0.0):
                         # Convert pixel coordinates to geographic coordinates (UTM or native CRS)
                         xmin, ymin, xmax, ymax = map(int, xyxy)
 
