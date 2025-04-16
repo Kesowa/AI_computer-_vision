@@ -13,10 +13,17 @@ import json
 # tiff_image_path = r"C:\Users\FS-AI\Downloads\AareyColonyOrthomosaic_4Band_2.7cm.tif"
 tiff_image_path = r"C:\Users\FS-AI\Downloads\Ortho_25cm.tif"
 
+def get_window_size_from_resolution(tiff_path, ground_area_meters=20):
+    import rasterio
+    with rasterio.open(tiff_path) as dataset:
+        res_x, res_y = dataset.res  # meters/pixel
+    size_x = int(ground_area_meters / res_x)
+    size_y = int(ground_area_meters / res_y)
+    return (size_x, size_y)
 
 # Define the slice size
-slice_size = (700, 700)
-
+#slice_size = (700, 700)
+slice_size = get_window_size_from_resolution(tiff_image_path, ground_area_meters=20)
 # Load the YOLOv7 model
 weights_path = r"C:\Users\FS-AI\Desktop\Construction_materials\best.pt"
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
