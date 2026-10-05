@@ -19,23 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-SCOPE OF THIS LICENSE
-
-This MIT licence covers the source code in this repository that was written by
-Kesowa Infinite Ventures.
-
-It does NOT grant rights in:
-
-  * Trained model weights distributed here (*.h5, *.onnx, *.pt, *.pkl). Several
-    are fine-tuned from third-party pretrained models whose own terms continue
-    to apply, and some of those terms are restricted to non-commercial research
-    use. See NOTICE for what we know about each.
-
-  * Third-party libraries, which carry their own licences.
-
-If you intend to use the model weights commercially, establish the licence of
-the upstream model each one derives from first. Do not assume this MIT grant
-covers them, because it does not.

@@ -6,6 +6,23 @@ Kesowa between 2021 and 2025. It is published for reference. The notes below
 record what we know about the provenance of the code and the model weights, so
 that anyone reusing them can check their own obligations.
 
+Scope of the MIT licence
+------------------------
+
+The MIT licence in LICENSE covers the source code in this repository that was
+written by Kesowa Infinite Ventures. It does NOT grant rights in:
+
+  * Trained model weights distributed here (*.h5, *.onnx, *.pt, *.pkl). Several
+    are fine-tuned from third-party pretrained models whose own terms continue
+    to apply, and some of those terms are restricted to non-commercial research
+    use. See "Model weights" below for what we know about each.
+
+  * Third-party libraries, which carry their own licences.
+
+If you intend to use the model weights commercially, establish the licence of
+the upstream model each one derives from first. Do not assume the MIT grant
+covers them, because it does not.
+
 Source code
 -----------
 
