@@ -1,0 +1,73 @@
+NOTICE
+======
+
+This repository is a collection of computer-vision research code written at
+Kesowa between 2021 and 2025. It is published for reference. The notes below
+record what we know about the provenance of the code and the model weights, so
+that anyone reusing them can check their own obligations.
+
+Source code
+-----------
+
+The Python source in this repository was written by Kesowa and is MIT licensed,
+with the exception of code that is clearly adapted from an upstream project.
+Where that is the case, the file says so.
+
+A copy of YOLOv7's `detect.py` (GPL-3.0, github.com/WongKinYiu/yolov7) was
+previously present under `construction_material/`. It has been removed, because
+GPL-3.0 code cannot be redistributed under this repository's MIT licence. If you
+need that script, take it from upstream under its own terms.
+
+Model weights
+-------------
+
+Trained weights are distributed here as a convenience and are NOT covered by
+the MIT licence. Each derives from an upstream pretrained model, and the
+upstream terms continue to apply:
+
+  Face_recognition/           VGG-Face architecture. The original VGG-Face
+                              weights from the University of Oxford are released
+                              for non-commercial research use only. Treat
+                              anything derived from them accordingly.
+
+  Tree_detection/             DeepForest (MIT), itself pretrained on NEON
+  Tree Count/                 airborne data. Check NEON's data policy for
+                              derived-product obligations.
+
+  Roof_top_segmentation/      U-Net trained on Kesowa imagery. The architecture
+                              is generic; the training data was ours.
+
+  construction_material/      Fine-tuned from YOLOv7, which is GPL-3.0. Weights
+                              fine-tuned from a GPL model occupy contested legal
+                              ground. Seek advice before commercial use.
+
+  Violence_detection/         Keras model. Upstream pretraining lineage is not
+                              recorded; provenance unverified.
+
+  people_count/               Expects YOLOv3 / YOLOv4-tiny weights, which are
+                              not distributed here. Obtain them from upstream.
+
+Where a lineage is marked unverified, we genuinely do not know. Do not read
+silence as permission.
+
+Personal data
+-------------
+
+An earlier version of this repository contained facial photographs of
+identifiable individuals under `Face_recognition/`, committed in 2021 as sample
+data. Those images, the accompanying video and a label encoder mapping
+embeddings to names were removed from the entire git history in 2026, and the
+history was rewritten. No facial images of identifiable people remain in this
+repository.
+
+The face-recognition source code remains. It ships with no dataset; you must
+supply your own, and you are responsible for having a lawful basis to process
+whatever images you use. Facial images are sensitive personal data under the
+Indian DPDP Act 2023 and the EU GDPR, among others.
+
+Geospatial references
+---------------------
+
+Some scripts contain coordinates and endpoint URLs from Kesowa survey projects,
+left in as examples. They refer to internal infrastructure that is not publicly
+reachable. They are not credentials.
